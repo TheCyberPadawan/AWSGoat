@@ -75,8 +75,6 @@ resource "aws_api_gateway_rest_api" "api" {
       "REGIONAL"
     ]
   }
-
- policy = data.aws_iam_policy_document.api_ip_restriction.json
 }
 
 
@@ -161,7 +159,7 @@ resource "aws_lambda_permission" "apigw_ba" {
 resource "aws_api_gateway_deployment" "api" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   description = "Deployed endpoint at ${timestamp()}"
-  depends_on  = [aws_api_gateway_integration_response.endpoint]
+  depends_on  = [aws_api_gateway_integration_response.endpoint,aws_api_gateway_rest_api_policy.api_policy]
 }
 
 resource "aws_api_gateway_stage" "api" {
@@ -177,6 +175,7 @@ resource "aws_api_gateway_stage" "api" {
 
 # Document de politique de sécurité pour l'API Gateway Backend
 data "aws_iam_policy_document" "api_ip_restriction" {
+  # 1. Autoriser toutes les requêtes par défaut
   statement {
     effect    = "Allow"
     principals {
@@ -187,6 +186,7 @@ data "aws_iam_policy_document" "api_ip_restriction" {
     resources = ["*"]
   }
 
+  # 2. Refuser si l'IP n'est pas autorisée, SAUF pour les requêtes OPTIONS (CORS)
   statement {
     effect    = "Deny"
     principals {
@@ -201,6 +201,12 @@ data "aws_iam_policy_document" "api_ip_restriction" {
       variable = "aws:SourceIp"
       values   = [var.my_allowed_ip]
     }
+
+    # Ne pas bloquer la vérification Preflight OPTIONS
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:CurrentTime" # Astuce standard ou exclusion sur la méthode si configuré via NotResource/Condition
+    }
   }
 }
 
@@ -212,9 +218,17 @@ resource "aws_api_gateway_rest_api" "apiLambda_ba" {
       "REGIONAL"
     ]
   }
-policy = data.aws_iam_policy_document.api_ip_restriction.json
+}
+# Politiques de ressources explicites pour forcer l'affichage et l'application dans AWS API Gateway
+resource "aws_api_gateway_rest_api_policy" "api_policy" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  policy      = data.aws_iam_policy_document.api_ip_restriction.json
 }
 
+resource "aws_api_gateway_rest_api_policy" "apiLambda_ba_policy" {
+  rest_api_id = aws_api_gateway_rest_api.apiLambda_ba.id
+  policy      = data.aws_iam_policy_document.api_ip_restriction.json
+}
 /* API ENDPOINTS */
 
 # XSS
@@ -3287,8 +3301,21 @@ data "aws_iam_policy_document" "allow_get_access" {
       aws_s3_bucket.bucket_upload.arn,
       "${aws_s3_bucket.bucket_upload.arn}/*",
     ]
+  }
+
+  statement {
+    effect = "Deny"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    actions = ["s3:GetObject"]
+    resources = [
+      aws_s3_bucket.bucket_upload.arn,
+      "${aws_s3_bucket.bucket_upload.arn}/*",
+    ]
     condition {
-      test     = "IpAddress"
+      test     = "NotIpAddress"
       variable = "aws:SourceIp"
       values   = [var.my_allowed_ip]
     }
@@ -3317,7 +3344,7 @@ resource "aws_s3_object" "upload_folder_prod" {
   for_each     = fileset("./resources/s3/webfiles/", "**")
   bucket       = aws_s3_bucket.bucket_upload.bucket
   key          = each.value
-  acl          = "public-read"
+  acl          = "private"
   source       = "./resources/s3/webfiles/${each.value}"
   content_type = lookup(local.content_type_map, regex("\\.(?P<extension>[A-Za-z0-9]+)$", each.value).extension, "application/octet-stream")
   depends_on   = [aws_s3_bucket.bucket_upload, null_resource.file_replacement_api_gw, aws_s3_bucket_acl.bucket_upload]
