@@ -10,6 +10,11 @@ provider "aws" {
   region = "us-east-1"
 }
 
+variable "my_allowed_ip" {
+  description = "IP publique autorisee a acceder a AWSGoat"
+  type        = string
+}
+
 data "aws_caller_identity" "current" {}
 
 
@@ -177,6 +182,22 @@ resource "aws_api_gateway_rest_api" "apiLambda_ba" {
       "REGIONAL"
     ]
   }
+policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "execute-api:Invoke"
+        Resource  = "arn:aws:execute-api:*:*:*"
+        Condition = {
+          IpAddress = {
+            "aws:SourceIp" = [var.my_allowed_ip]
+          }
+        }
+      }
+    ]
+  })
 }
 
 
@@ -3472,7 +3493,7 @@ resource "aws_security_group" "goat_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_allowed_ip]
   }
   egress {
     from_port   = 0
