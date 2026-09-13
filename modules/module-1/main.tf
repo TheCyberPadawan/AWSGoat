@@ -76,28 +76,7 @@ resource "aws_api_gateway_rest_api" "api" {
     ]
   }
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "execute-api:Invoke"
-        Resource  = "arn:aws:execute-api:*:*:*"
-      },
-      {
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "execute-api:Invoke"
-        Resource  = "arn:aws:execute-api:*:*:*"
-        Condition = {
-          NotIpAddress = {
-            "aws:SourceIp" = [var.my_allowed_ip]
-          }
-        }
-      }
-    ]
-  })
+ policy = data.aws_iam_policy_document.api_ip_restriction.json
 }
 
 
@@ -196,6 +175,34 @@ resource "aws_api_gateway_stage" "api" {
 
 /* API Gateway -- REST API lambda_ba */
 
+# Document de politique de sécurité pour l'API Gateway Backend
+data "aws_iam_policy_document" "api_ip_restriction" {
+  statement {
+    effect    = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    actions   = ["execute-api:Invoke"]
+    resources = ["*"]
+  }
+
+  statement {
+    effect    = "Deny"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    actions   = ["execute-api:Invoke"]
+    resources = ["*"]
+
+    condition {
+      test     = "NotIpAddress"
+      variable = "aws:SourceIp"
+      values   = [var.my_allowed_ip]
+    }
+  }
+}
 
 resource "aws_api_gateway_rest_api" "apiLambda_ba" {
   name           = "blog-application-api"
@@ -205,34 +212,7 @@ resource "aws_api_gateway_rest_api" "apiLambda_ba" {
       "REGIONAL"
     ]
   }
-}
-
-# --- AJOUT DE LA RESOURCE POLICY DÉDIÉE ---
-resource "aws_api_gateway_rest_api_policy" "apiLambda_ba_policy" {
-  rest_api_id = aws_api_gateway_rest_api.apiLambda_ba.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "execute-api:Invoke"
-        Resource  = "arn:aws:execute-api:*:*:*"
-      },
-      {
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "execute-api:Invoke"
-        Resource  = "arn:aws:execute-api:*:*:*"
-        Condition = {
-          NotIpAddress = {
-            "aws:SourceIp" = [var.my_allowed_ip]
-          }
-        }
-      }
-    ]
-  })
+policy = data.aws_iam_policy_document.api_ip_restriction.json
 }
 
 /* API ENDPOINTS */
@@ -3307,6 +3287,11 @@ data "aws_iam_policy_document" "allow_get_access" {
       aws_s3_bucket.bucket_upload.arn,
       "${aws_s3_bucket.bucket_upload.arn}/*",
     ]
+    condition {
+      test     = "IpAddress"
+      variable = "aws:SourceIp"
+      values   = [var.my_allowed_ip]
+    }
   }
 }
 resource "aws_s3_bucket_cors_configuration" "bucket_upload" {
