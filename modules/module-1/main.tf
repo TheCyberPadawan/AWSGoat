@@ -75,6 +75,29 @@ resource "aws_api_gateway_rest_api" "api" {
       "REGIONAL"
     ]
   }
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "execute-api:Invoke"
+        Resource  = "arn:aws:execute-api:*:*:*"
+      },
+      {
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "execute-api:Invoke"
+        Resource  = "arn:aws:execute-api:*:*:*"
+        Condition = {
+          NotIpAddress = {
+            "aws:SourceIp" = [var.my_allowed_ip]
+          }
+        }
+      }
+    ]
+  })
 }
 
 
@@ -182,7 +205,8 @@ resource "aws_api_gateway_rest_api" "apiLambda_ba" {
       "REGIONAL"
     ]
   }
-policy = jsonencode({
+
+  policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
@@ -190,9 +214,18 @@ policy = jsonencode({
         Principal = "*"
         Action    = "execute-api:Invoke"
         Resource  = "arn:aws:execute-api:*:*:*"
+      },
+      {
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "execute-api:Invoke"
+        Resource  = "arn:aws:execute-api:*:*:*"
         Condition = {
-          IpAddress = {
+          NotIpAddress = {
             "aws:SourceIp" = [var.my_allowed_ip]
+          }
+          StringNotEquals = {
+            "execute-api:SymbolicMethod" = "OPTIONS"
           }
         }
       }
