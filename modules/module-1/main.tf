@@ -205,6 +205,11 @@ resource "aws_api_gateway_rest_api" "apiLambda_ba" {
       "REGIONAL"
     ]
   }
+}
+
+# --- AJOUT DE LA RESOURCE POLICY DÉDIÉE ---
+resource "aws_api_gateway_rest_api_policy" "apiLambda_ba_policy" {
+  rest_api_id = aws_api_gateway_rest_api.apiLambda_ba.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -224,15 +229,11 @@ resource "aws_api_gateway_rest_api" "apiLambda_ba" {
           NotIpAddress = {
             "aws:SourceIp" = [var.my_allowed_ip]
           }
-          StringNotEquals = {
-            "execute-api:SymbolicMethod" = "OPTIONS"
-          }
         }
       }
     ]
   })
 }
-
 
 /* API ENDPOINTS */
 
@@ -2984,6 +2985,7 @@ resource "aws_api_gateway_integration_response" "lambda_change_profile_root_opti
 
 resource "aws_api_gateway_deployment" "apideploy_ba" {
   depends_on = [
+	aws_api_gateway_rest_api_policy.apiLambda_ba_policy,
     aws_api_gateway_integration_response.save_content_root_options_integration_response,
     aws_api_gateway_integration_response.search_author_root_options_integration_response,
 
@@ -3115,12 +3117,12 @@ resource "aws_api_gateway_deployment" "apideploy_ba" {
   variables = {
     "BLOG_KEY" = "655877f0f8ade541e1d21a48fe396ddb"
   }
-}
 
-triggers = {
-    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.apiLambda_ba.policy))
+  triggers = {
+    redeployment = sha1(jsonencode(aws_api_gateway_rest_api_policy.apiLambda_ba_policy.policy))
   }
-lifecycle {
+
+  lifecycle {
     create_before_destroy = true
   }
 }
