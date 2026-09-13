@@ -57,5 +57,5 @@ jobs:
     - name: Terraform Destroy
       run: |
         cd modules/${{ github.event.inputs.module }}
-        terraform destroy -auto-approve -input=false
+        terraform destroy -auto-approve -input=false -var="my_allowed_ip=${{ secrets.MY_ALLOWED_IP }}"
       continue-on-error: false
