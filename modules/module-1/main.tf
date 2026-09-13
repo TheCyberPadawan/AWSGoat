@@ -3084,6 +3084,13 @@ resource "aws_api_gateway_deployment" "apideploy_ba" {
   }
 }
 
+triggers = {
+    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.apiLambda_ba.policy))
+  }
+lifecycle {
+    create_before_destroy = true
+  }
+}
 /* Lambda Setup - blog-application-data*/
 
 data "archive_file" "lambda_zip_bap" {
