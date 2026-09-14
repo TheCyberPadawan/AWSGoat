@@ -81,6 +81,7 @@ jobs:
       run: exit 1
     
     - name: Terraform Apply
+      TF_LOG: "DEBUG"
       run: | 
         cd modules/${{ github.event.inputs.module }}
         terraform apply -auto-approve -input=false -var="my_allowed_ip=${{ secrets.MY_ALLOWED_IP }}"
