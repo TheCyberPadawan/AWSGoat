@@ -33,7 +33,7 @@ resource "aws_lambda_function" "react_lambda_app" {
   role          = aws_iam_role.blog_app_lambda.arn
   depends_on    = [data.archive_file.lambda_zip, null_resource.file_replacement_lambda_react]
 }
-
+/* test */
 
 /* Lambda iam Role */
 
